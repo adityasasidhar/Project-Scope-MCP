@@ -7,6 +7,7 @@ import {
 import { getRepoStructure } from "./tools/repo-structure.js";
 import { analyzeImpact } from "./tools/impact-analysis.js";
 import { gitBranchStatus, gitCommitHistory, gitShowChanges, gitCompareBranches, gitInit, gitStatus } from "./tools/git-tools.js";
+import { refactorRename, refactorExtractFunction, refactorMoveToFile, refactorInlineVariable, findDeadCode } from "./tools/refactoring-tools.js";
 
 const server = new Server(
     {
@@ -208,6 +209,78 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     required: ["path"],
                 },
             },
+            {
+                name: "refactor_rename",
+                description: "Rename a symbol (variable, function, class) across the entire codebase. Returns preview of changes, optionally applies them.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        path: { type: "string", description: "Root path of the repository" },
+                        filePath: { type: "string", description: "Path to file containing the symbol" },
+                        symbolName: { type: "string", description: "Current name of the symbol" },
+                        newName: { type: "string", description: "New name for the symbol" },
+                        apply: { type: "boolean", description: "Apply changes (default: false, preview only)" },
+                    },
+                    required: ["path", "filePath", "symbolName", "newName"],
+                },
+            },
+            {
+                name: "refactor_extract_function",
+                description: "Extract a block of code into a new function. Detects parameters and generates function call.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        path: { type: "string", description: "Root path of the repository" },
+                        filePath: { type: "string", description: "Path to the file" },
+                        startLine: { type: "number", description: "Starting line of code to extract" },
+                        endLine: { type: "number", description: "Ending line of code to extract" },
+                        functionName: { type: "string", description: "Name for the new function" },
+                        apply: { type: "boolean", description: "Apply changes (default: false)" },
+                    },
+                    required: ["path", "filePath", "startLine", "endLine", "functionName"],
+                },
+            },
+            {
+                name: "refactor_move_to_file",
+                description: "Move a function or class to a different file. Updates imports automatically.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        path: { type: "string", description: "Root path of the repository" },
+                        sourceFile: { type: "string", description: "Path to source file" },
+                        symbolName: { type: "string", description: "Name of function/class to move" },
+                        targetFile: { type: "string", description: "Path to target file" },
+                        apply: { type: "boolean", description: "Apply changes (default: false)" },
+                    },
+                    required: ["path", "sourceFile", "symbolName", "targetFile"],
+                },
+            },
+            {
+                name: "refactor_inline_variable",
+                description: "Inline a variable by replacing all usages with its value and removing the declaration.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        path: { type: "string", description: "Root path of the repository" },
+                        filePath: { type: "string", description: "Path to the file" },
+                        variableName: { type: "string", description: "Name of the variable to inline" },
+                        line: { type: "number", description: "Line number of the variable declaration" },
+                        apply: { type: "boolean", description: "Apply changes (default: false)" },
+                    },
+                    required: ["path", "filePath", "variableName", "line"],
+                },
+            },
+            {
+                name: "find_dead_code",
+                description: "Find potentially unused exports and functions in the codebase.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        path: { type: "string", description: "Root path of the repository" },
+                    },
+                    required: ["path"],
+                },
+            },
         ],
     };
 });
@@ -301,6 +374,68 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         else if (name === "git_status") {
             if (!args) throw new Error("Arguments are required");
             const result = await gitStatus(args.path as string);
+            return {
+                content: [{ type: "text", text: result.visualization }],
+            };
+        }
+        else if (name === "refactor_rename") {
+            if (!args) throw new Error("Arguments are required");
+            const result = await refactorRename({
+                repoPath: args.path as string,
+                filePath: args.filePath as string,
+                symbolName: args.symbolName as string,
+                newName: args.newName as string,
+                apply: args.apply as boolean | undefined,
+            });
+            return {
+                content: [{ type: "text", text: result.visualization }],
+            };
+        }
+        else if (name === "refactor_extract_function") {
+            if (!args) throw new Error("Arguments are required");
+            const result = await refactorExtractFunction({
+                repoPath: args.path as string,
+                filePath: args.filePath as string,
+                startLine: args.startLine as number,
+                endLine: args.endLine as number,
+                functionName: args.functionName as string,
+                apply: args.apply as boolean | undefined,
+            });
+            return {
+                content: [{ type: "text", text: result.visualization }],
+            };
+        }
+        else if (name === "refactor_move_to_file") {
+            if (!args) throw new Error("Arguments are required");
+            const result = await refactorMoveToFile({
+                repoPath: args.path as string,
+                sourceFile: args.sourceFile as string,
+                symbolName: args.symbolName as string,
+                targetFile: args.targetFile as string,
+                apply: args.apply as boolean | undefined,
+            });
+            return {
+                content: [{ type: "text", text: result.visualization }],
+            };
+        }
+        else if (name === "refactor_inline_variable") {
+            if (!args) throw new Error("Arguments are required");
+            const result = await refactorInlineVariable({
+                repoPath: args.path as string,
+                filePath: args.filePath as string,
+                variableName: args.variableName as string,
+                line: args.line as number,
+                apply: args.apply as boolean | undefined,
+            });
+            return {
+                content: [{ type: "text", text: result.visualization }],
+            };
+        }
+        else if (name === "find_dead_code") {
+            if (!args) throw new Error("Arguments are required");
+            const result = await findDeadCode({
+                repoPath: args.path as string,
+            });
             return {
                 content: [{ type: "text", text: result.visualization }],
             };

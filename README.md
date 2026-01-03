@@ -16,6 +16,13 @@ A Model Context Protocol (MCP) server that provides powerful tools for repositor
 - **`git_show_changes`** - Show staged, unstaged, and untracked files with optional diff
 - **`git_compare_branches`** - Compare two branches showing unique commits and changed files
 
+### Refactoring
+- **`refactor_rename`** - Rename a symbol across the entire codebase (preview + apply)
+- **`refactor_extract_function`** - Extract code block into a new function
+- **`refactor_move_to_file`** - Move function/class to a different file with import updates
+- **`refactor_inline_variable`** - Inline a variable by replacing usages with its value
+- **`find_dead_code`** - Detect potentially unused exports and functions
+
 ## Installation
 
 ```bash
@@ -102,6 +109,36 @@ npm run build  # Compile TypeScript
   "branch1": "main",
   "branch2": "feature-branch",
   "showDiff": true
+}
+```
+
+### refactor_rename
+```json
+{
+  "path": "/path/to/repo",
+  "filePath": "src/utils.ts",
+  "symbolName": "oldName",
+  "newName": "newName",
+  "apply": false
+}
+```
+
+### refactor_extract_function
+```json
+{
+  "path": "/path/to/repo",
+  "filePath": "src/main.ts",
+  "startLine": 10,
+  "endLine": 20,
+  "functionName": "extractedFunction",
+  "apply": false
+}
+```
+
+### find_dead_code
+```json
+{
+  "path": "/path/to/repo"
 }
 ```
 
