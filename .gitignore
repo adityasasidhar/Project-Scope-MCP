@@ -1,16 +1,77 @@
-/tmp
-/out-tsc
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
 
-/node_modules
-/dist
-/build
+# Build output
+dist/
+build/
+out-tsc/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# OS files
 .DS_Store
-/.idea
-/.vscode
-/.env
-/coverage
-/.pnp
-.pnp.js
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Optional npm cache
+.npm/
+.cache/
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Testing
+.jest/
+jest.config.js.cache
+
+# Native binaries (tree-sitter related)
+*.node
+prebuilds/
