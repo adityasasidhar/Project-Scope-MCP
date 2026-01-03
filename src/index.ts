@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -8,7 +6,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { getRepoStructure } from "./tools/repo-structure.js";
 import { analyzeImpact } from "./tools/impact-analysis.js";
-import { gitBranchStatus, gitCommitHistory, gitShowChanges, gitCompareBranches } from "./tools/git-tools.js";
+import { gitBranchStatus, gitCommitHistory, gitShowChanges, gitCompareBranches, gitInit, gitStatus } from "./tools/git-tools.js";
 
 const server = new Server(
     {
@@ -174,6 +172,42 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     required: ["path", "branch1", "branch2"],
                 },
             },
+            {
+                name: "git_init",
+                description: "Initialize a new Git repository. Creates a .git directory and sets up the repository structure.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        path: {
+                            type: "string",
+                            description: "Path where the repository should be initialized",
+                        },
+                        initialBranch: {
+                            type: "string",
+                            description: "Name of the initial branch (default: 'main')",
+                        },
+                        bare: {
+                            type: "boolean",
+                            description: "Create a bare repository (default: false)",
+                        },
+                    },
+                    required: ["path"],
+                },
+            },
+            {
+                name: "git_status",
+                description: "Get a quick overview of the repository status including current branch, staged/unstaged/untracked file counts, and remote tracking info.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        path: {
+                            type: "string",
+                            description: "Root path of the git repository",
+                        },
+                    },
+                    required: ["path"],
+                },
+            },
         ],
     };
 });
@@ -251,6 +285,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             });
             return {
                 content: [{ type: "text", text: result.visualization + (result.diff ? "\n\nDETAILED DIFF:\n" + result.diff : "") }],
+            };
+        }
+        else if (name === "git_init") {
+            if (!args) throw new Error("Arguments are required");
+            const result = await gitInit({
+                path: args.path as string,
+                initialBranch: args.initialBranch as string | undefined,
+                bare: args.bare as boolean | undefined,
+            });
+            return {
+                content: [{ type: "text", text: result.visualization }],
+            };
+        }
+        else if (name === "git_status") {
+            if (!args) throw new Error("Arguments are required");
+            const result = await gitStatus(args.path as string);
+            return {
+                content: [{ type: "text", text: result.visualization }],
             };
         } else {
             throw new Error(`Unknown tool: ${name}`);

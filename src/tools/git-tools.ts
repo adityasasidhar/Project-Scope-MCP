@@ -493,3 +493,274 @@ function createComparisonVisualization(
 
     return viz;
 }
+
+// ============================================
+// TOOL 5: Git Init
+// ============================================
+
+export interface GitInitParams {
+    path: string;
+    initialBranch?: string;
+    bare?: boolean;
+}
+
+export interface GitInitResult {
+    success: boolean;
+    path: string;
+    message: string;
+    visualization: string;
+}
+
+export async function gitInit(params: GitInitParams): Promise<GitInitResult> {
+    const { path: repoPath, initialBranch = 'main', bare = false } = params;
+
+    // Check if directory exists
+    try {
+        await fs.access(repoPath);
+    } catch {
+        // Create directory if it doesn't exist
+        await fs.mkdir(repoPath, { recursive: true });
+    }
+
+    // Check if already a git repo
+    try {
+        const git = getGit(repoPath);
+        await git.status();
+        return {
+            success: false,
+            path: repoPath,
+            message: 'Directory is already a git repository',
+            visualization: createInitVisualization(repoPath, false, 'Already initialized'),
+        };
+    } catch {
+        // Not a git repo, proceed with initialization
+    }
+
+    const git = getGit(repoPath);
+
+    const initOptions: string[] = [];
+    if (bare) {
+        initOptions.push('--bare');
+    }
+    initOptions.push('--initial-branch', initialBranch);
+
+    await git.init(initOptions);
+
+    return {
+        success: true,
+        path: repoPath,
+        message: `Initialized empty Git repository in ${repoPath}`,
+        visualization: createInitVisualization(repoPath, true, initialBranch, bare),
+    };
+}
+
+function createInitVisualization(repoPath: string, success: boolean, branch: string, bare: boolean = false): string {
+    let viz = '\n GIT INITIALIZATION\n';
+    viz += '-'.repeat(50) + '\n\n';
+
+    if (success) {
+        viz += `[Success] Repository initialized\n\n`;
+        viz += `   Path: ${repoPath}\n`;
+        viz += `   Initial branch: ${branch}\n`;
+        viz += `   Type: ${bare ? 'Bare repository' : 'Standard repository'}\n\n`;
+        viz += `Next steps:\n`;
+        viz += `   1. Add files: git add .\n`;
+        viz += `   2. Commit: git commit -m "Initial commit"\n`;
+        viz += `   3. Add remote: git remote add origin <url>\n`;
+    } else {
+        viz += `[Skipped] ${branch}\n\n`;
+        viz += `   Path: ${repoPath}\n`;
+    }
+
+    return viz;
+}
+
+// ============================================
+// TOOL 6: Git Status (Quick Overview)
+// ============================================
+
+export interface GitStatusResult {
+    isRepo: boolean;
+    branch: string;
+    ahead: number;
+    behind: number;
+    staged: number;
+    modified: number;
+    untracked: number;
+    conflicts: number;
+    isClean: boolean;
+    visualization: string;
+}
+
+export async function gitStatus(repoPath: string): Promise<GitStatusResult> {
+    // Check if it's a git repo
+    try {
+        await fs.access(path.join(repoPath, '.git'));
+    } catch {
+        return {
+            isRepo: false,
+            branch: '',
+            ahead: 0,
+            behind: 0,
+            staged: 0,
+            modified: 0,
+            untracked: 0,
+            conflicts: 0,
+            isClean: false,
+            visualization: createStatusVisualization({
+                isRepo: false,
+                branch: '',
+                ahead: 0,
+                behind: 0,
+                staged: 0,
+                modified: 0,
+                untracked: 0,
+                conflicts: 0,
+                isClean: false,
+            }, repoPath),
+        };
+    }
+
+    const git = getGit(repoPath);
+    const status: StatusResult = await git.status();
+
+    const result: Omit<GitStatusResult, 'visualization'> = {
+        isRepo: true,
+        branch: status.current || 'HEAD (detached)',
+        ahead: status.ahead,
+        behind: status.behind,
+        staged: status.staged.length,
+        modified: status.modified.length,
+        untracked: status.not_added.length,
+        conflicts: status.conflicted.length,
+        isClean: status.isClean(),
+    };
+
+    return {
+        ...result,
+        visualization: createStatusVisualization(result, repoPath),
+    };
+}
+
+function createStatusVisualization(status: Omit<GitStatusResult, 'visualization'>, repoPath: string): string {
+    let viz = '\n GIT STATUS\n';
+    viz += '-'.repeat(50) + '\n\n';
+
+    if (!status.isRepo) {
+        viz += `[Not a Git Repository]\n`;
+        viz += `   Path: ${repoPath}\n\n`;
+        viz += `   Run 'git init' to initialize a repository.\n`;
+        return viz;
+    }
+
+    viz += `Branch: ${status.branch}\n`;
+
+    // Remote tracking
+    if (status.ahead > 0 || status.behind > 0) {
+        viz += `Remote: `;
+        if (status.ahead > 0) viz += `↑${status.ahead} ahead `;
+        if (status.behind > 0) viz += `↓${status.behind} behind`;
+        viz += '\n';
+    }
+
+    viz += '\n';
+
+    if (status.isClean) {
+        viz += `[Clean] Working directory is clean\n`;
+    } else {
+        viz += `Changes:\n`;
+        if (status.staged > 0) {
+            viz += `   [Staged]    ${status.staged} file(s) ready to commit\n`;
+        }
+        if (status.modified > 0) {
+            viz += `   [Modified]  ${status.modified} file(s) with unstaged changes\n`;
+        }
+        if (status.untracked > 0) {
+            viz += `   [Untracked] ${status.untracked} new file(s)\n`;
+        }
+        if (status.conflicts > 0) {
+            viz += `   [Conflicts] ${status.conflicts} file(s) with merge conflicts\n`;
+        }
+    }
+
+    return viz;
+}
+
+// ============================================
+// TOOL 7: Git Remove
+// ============================================
+
+export interface GitRemoveParams {
+    repoPath: string;
+    files: string[];
+    cached?: boolean;  // Remove from index only (keep file on disk)
+    recursive?: boolean;  // Remove directories recursively
+    force?: boolean;  // Force removal
+}
+
+export interface GitRemoveResult {
+    success: boolean;
+    removedFiles: string[];
+    errors: string[];
+    visualization: string;
+}
+
+export async function gitRemove(params: GitRemoveParams): Promise<GitRemoveResult> {
+    const { repoPath, files, cached = false, recursive = false, force = false } = params;
+    await validateGitRepo(repoPath);
+
+    const git = getGit(repoPath);
+    const removedFiles: string[] = [];
+    const errors: string[] = [];
+
+    const options: string[] = [];
+    if (cached) options.push('--cached');
+    if (recursive) options.push('-r');
+    if (force) options.push('-f');
+
+    for (const file of files) {
+        try {
+            await git.rm([...options, file]);
+            removedFiles.push(file);
+        } catch (error) {
+            errors.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    return {
+        success: errors.length === 0,
+        removedFiles,
+        errors,
+        visualization: createRemoveVisualization(removedFiles, errors, cached),
+    };
+}
+
+function createRemoveVisualization(removed: string[], errors: string[], cached: boolean): string {
+    let viz = '\n GIT REMOVE\n';
+    viz += '-'.repeat(50) + '\n\n';
+
+    if (removed.length > 0) {
+        viz += `Successfully removed ${removed.length} file(s)${cached ? ' from index' : ''}:\n`;
+        for (const file of removed) {
+            viz += `   [Removed] ${file}\n`;
+        }
+        viz += '\n';
+    }
+
+    if (errors.length > 0) {
+        viz += `Failed to remove ${errors.length} file(s):\n`;
+        for (const error of errors) {
+            viz += `   [Error] ${error}\n`;
+        }
+        viz += '\n';
+    }
+
+    if (removed.length > 0) {
+        viz += `Note: Changes are staged. Run 'git commit' to finalize.\n`;
+        if (cached) {
+            viz += `      Files were removed from Git tracking but kept on disk.\n`;
+        }
+    }
+
+    return viz;
+}
