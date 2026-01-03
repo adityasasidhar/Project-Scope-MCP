@@ -207,6 +207,51 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             return {
                 content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
             };
+        }
+        else if (name === "git_branch_status") {
+            if (!args) throw new Error("Arguments are required");
+            const result = await gitBranchStatus(args.path as string);
+            return {
+                content: [{ type: "text", text: result.visualization }],
+            };
+        }
+        else if (name === "git_commit_history") {
+            if (!args) throw new Error("Arguments are required");
+            const result = await gitCommitHistory({
+                repoPath: args.path as string,
+                maxCount: args.maxCount as number | undefined,
+                filePath: args.filePath as string | undefined,
+                author: args.author as string | undefined,
+                since: args.since as string | undefined,
+                until: args.until as string | undefined,
+            });
+            return {
+                content: [{ type: "text", text: result.visualization }],
+            };
+        }
+        else if (name === "git_show_changes") {
+            if (!args) throw new Error("Arguments are required");
+            const result = await gitShowChanges({
+                repoPath: args.path as string,
+                includeUntracked: args.includeUntracked as boolean | undefined,
+                showDiff: args.showDiff as boolean | undefined,
+                filePath: args.filePath as string | undefined,
+            });
+            return {
+                content: [{ type: "text", text: result.visualization + (result.detailedDiff ? "\n\nDETAILED DIFF:\n" + result.detailedDiff : "") }],
+            };
+        }
+        else if (name === "git_compare_branches") {
+            if (!args) throw new Error("Arguments are required");
+            const result = await gitCompareBranches({
+                repoPath: args.path as string,
+                branch1: args.branch1 as string,
+                branch2: args.branch2 as string,
+                showDiff: args.showDiff as boolean | undefined,
+            });
+            return {
+                content: [{ type: "text", text: result.visualization + (result.diff ? "\n\nDETAILED DIFF:\n" + result.diff : "") }],
+            };
         } else {
             throw new Error(`Unknown tool: ${name}`);
         }
