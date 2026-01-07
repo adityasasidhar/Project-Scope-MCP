@@ -178,7 +178,16 @@ npx -y @adityasasidhar/project-scope-mcp
    *(Or use `npm run start` if preferred)*
 
 
+### GitHub Copilot (VS Code)
 
+1.  Open **GitHub Copilot Chat** in VS Code.
+2.  Click the **Attach Context** (paperclip) or **Tools** icons.
+3.  Select **Connect to MCP Server...**
+4.  Choose **Command** (or similar) and enter:
+    - **Command**: `npx`
+    - **Args**: `-y @adityasasidhar/project-scope-mcp`
+
+*Note: Requires GitHub Copilot Agent Mode enabled in VS Code settings.*
 ---
 
 ##  Tool Reference
