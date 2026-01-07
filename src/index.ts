@@ -292,7 +292,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     properties: {
                         input: { type: "string", description: "The shell command or string to validate" },
                         mode: { type: "string", enum: ["strict", "advisory"], description: "Validation mode: 'strict' blocks threats, 'advisory' provides warnings (default: strict)" },
-                        sensitivity: { type: "string", enum: ["high", "medium", "low"], description: "Detection sensitivity (default: high)" },
+                        sensitivity: { type: "string", enum: ["high", "medium", "low"], description: "Detection sensitivity: high=aggressive, medium=balanced, low=high-confidence only (default: medium)" },
+                        allowedCommands: { type: "array", items: { type: "string" }, description: "List of allowed commands to exclude from threat detection (e.g., ['ls', 'cat', 'echo'])" },
                     },
                     required: ["input"],
                 },
@@ -305,7 +306,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     properties: {
                         query: { type: "string", description: "The SQL query string to validate" },
                         mode: { type: "string", enum: ["strict", "advisory"], description: "Validation mode (default: strict)" },
-                        sensitivity: { type: "string", enum: ["high", "medium", "low"], description: "Detection sensitivity (default: high)" },
+                        sensitivity: { type: "string", enum: ["high", "medium", "low"], description: "Detection sensitivity (default: medium)" },
+                        allowedKeywords: { type: "array", items: { type: "string" }, description: "SQL keywords to allow (e.g., ['SELECT', 'INSERT', 'UPDATE'])" },
                     },
                     required: ["query"],
                 },
@@ -546,7 +548,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 args.input as string,
                 {
                     mode: (args.mode as 'strict' | 'advisory') || 'strict',
-                    sensitivity: (args.sensitivity as 'high' | 'medium' | 'low') || 'high',
+                    sensitivity: (args.sensitivity as 'high' | 'medium' | 'low') || 'medium',
+                    allowlist: args.allowedCommands ? { commands: args.allowedCommands as string[] } : undefined,
                 }
             );
             const viz = createSecurityVisualization("Shell Command Validator", result);
@@ -560,7 +563,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 args.query as string,
                 {
                     mode: (args.mode as 'strict' | 'advisory') || 'strict',
-                    sensitivity: (args.sensitivity as 'high' | 'medium' | 'low') || 'high',
+                    sensitivity: (args.sensitivity as 'high' | 'medium' | 'low') || 'medium',
+                    allowlist: args.allowedKeywords ? { sql_keywords: args.allowedKeywords as string[] } : undefined,
                 }
             );
             const viz = createSecurityVisualization("SQL Injection Detector", result);

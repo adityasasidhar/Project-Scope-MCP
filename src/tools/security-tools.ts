@@ -31,7 +31,7 @@ export interface SecurityConfig {
 
 const DEFAULT_CONFIG: SecurityConfig = {
     mode: 'strict',
-    sensitivity: 'high',
+    sensitivity: 'medium',
 };
 
 type RiskLevel = 'critical' | 'high' | 'medium' | 'low';
@@ -138,7 +138,6 @@ const PROMPT_PATTERNS = {
     toolManipulation: /use\s+tool|execute|run\s+command|call\s+function|invoke/i,
     memoryPoisoning: /remember\s+that|always\s+respond\s+with|from\s+now\s+on/i,
     developerMode: /developer\s+mode|jailbreak|DAN|do\s+anything\s+now/i,
-    // Advanced patterns
     base64Pattern: /[A-Za-z0-9+\/]{20,}={0,2}/,
     rot13Pattern: /[A-Za-z]{10,}\s+[A-Za-z]{10,}/,
     unicodeEscape: /\\u[0-9a-fA-F]{4}|\\x[0-9a-fA-F]{2}/,

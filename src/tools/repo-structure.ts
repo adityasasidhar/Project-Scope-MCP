@@ -21,7 +21,7 @@ interface RepoStructure {
 
 type OutputFormat = 'tree' | 'simple' | 'json';
 
-// Common patterns to ignore (LLM is aware of these)
+// Common patterns to ignore
 const DEFAULT_IGNORE_PATTERNS = [
     "**/node_modules/**",
     "**/.git/**",
@@ -35,7 +35,7 @@ const DEFAULT_IGNORE_PATTERNS = [
     "**/venv/**",
     "**/env/**",
     "**/.venv/**",
-    "**/target/**", // Java/Rust build output
+    "**/target/**",
     "**/bin/**",
     "**/obj/**",
     "**/.idea/**",
@@ -180,7 +180,7 @@ async function buildTree(
 
                 if (isDirectory) {
                     childNode.children = [];
-                } else {
+                } else { 
                     // Get file size
                     try {
                         const fullPath = path.join(rootPath, currentPath);
