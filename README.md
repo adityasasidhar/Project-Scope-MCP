@@ -139,6 +139,25 @@ The official [Claude Code CLI](https://docs.anthropic.com/en/docs/agents-and-too
     args = ["-y", "@adityasasidhar/project-scope-mcp"]
     ```
 
+### Gemini CLI
+
+[Gemini CLI](https://github.com/google/gemini-cli) supports MCP via its JSON configuration.
+
+1.  **Edit Configuration:**
+    Open `~/.gemini/settings.json` (create if it doesn't exist).
+
+2.  **Add Server:**
+    ```json
+    {
+      "mcpServers": {
+        "project-scope": {
+          "command": "npx",
+          "args": ["-y", "@adityasasidhar/project-scope-mcp"]
+        }
+      }
+    }
+    ```
+
 ### Generic Clients
 
 For any other client that supports MCP (like **Windsurf**, **Smithery**, **Goose**, or custom implementations), use the standard stdio configuration:
