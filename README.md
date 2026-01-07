@@ -4,37 +4,37 @@
 
 ---
 
-## 📖 Overview
+## Overview
 
 Project Scope moves beyond simple file reading to provide **semantic analysis**, **AST-based refactoring**, **Git integration**, and **defense-in-depth security validation**. It allows Large Language Models (LLMs) to interact with codebases reliably and safely, bridging the gap between chat interfaces and complex development workflows.
 
-## 🚀 Key Features
+## Key Features
 
-- **🧠 Semantic Repository Analysis**: Parse and understand code structure, dependencies, and relationships using Tree-sitter.
-- **🛡️ Context-Aware Security**: Advanced scanner with zero false positives on source code, detecting SQLi, XSS, and RCE attempts in runtime inputs.
-- **🔄 Safe Refactoring**: AST-based renaming and extraction tools with "preview first" capabilities to prevent syntax errors.
-- **📦 Git Integration**: Comprehensive version control management including history, diffing, and branch operations.
-- **🔒 Defense-in-Depth**: Multi-layered protection including Prompt Injection detection (Regex + LLM Guard), input validation, and file access controls.
+- **Semantic Repository Analysis**: Parse and understand code structure, dependencies, and relationships using Tree-sitter.
+- **Context-Aware Security**: Advanced scanner with zero false positives on source code, detecting SQLi, XSS, and RCE attempts in runtime inputs.
+- **Safe Refactoring**: AST-based renaming and extraction tools with "preview first" capabilities to prevent syntax errors.
+- **Git Integration**: Comprehensive version control management including history, diffing, and branch operations.
+- **Defense-in-Depth**: Multi-layered protection including Prompt Injection detection (Regex + LLM Guard), input validation, and file access controls.
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 
-- [Installation](#-installation)
-- [Configuration](#-configuration)
-- [Security Architecture](#-security-architecture)
-- [Usage](#-usage)
-- [Tool Reference](#-tool-reference)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Security Architecture](#security-architecture)
+- [Connecting Clients](#connecting-clients)
+- [Tool Reference](#tool-reference)
   - [Repository Analysis](#repository-analysis)
   - [Security Scanning](#security-scanning)
   - [Refactoring](#refactoring)
   - [Git Operations](#git-operations)
-- [Troubleshooting](#-troubleshooting)
-- [License](#-license)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
 
 ---
 
-## 📦 Installation
+## Installation
 
 ```bash
 # Install dependencies
@@ -46,7 +46,7 @@ npm run build
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 Security is a primary focus of Project Scope. The server is highly customizable to match your risk profile.
 
@@ -66,11 +66,11 @@ For state-of-the-art protection against prompt injection attacks, enable **Meta 
 
 ---
 
-## 🛡️ Security Architecture
+## Security Architecture
 
 The server features a **Context-Aware Security Scanner** designed to eliminate false positives while maintaining rigorous threat detection.
 
-### Intelligent Context Detection
+## Intelligent Context Detection
 
 The scanner uses file categorization to determine the appropriate validation strategy:
 
@@ -92,12 +92,15 @@ This ensures that *documenting* a security vulnerability in a comment or test fi
 
 ---
 
-## 💻 Usage
+## 🔌 Connecting Clients
 
-### With Claude Desktop
+### Claude Desktop
 
-Add the following to your `claude_desktop_config.json`:
+1. Open your configuration file:
+   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
+2. Add the server definition:
 ```json
 {
   "mcpServers": {
@@ -109,15 +112,27 @@ Add the following to your `claude_desktop_config.json`:
 }
 ```
 
-### Development Mode
+### Cursor
 
-```bash
-npm run dev    # Run with hot-reloading (using tsx)
-```
+1. Open **Cursor Settings** (Cmd/Ctrl + Shift + J).
+2. Navigate to **Features** > **MCP Servers**.
+3. Click **+ Add New MCP Server**.
+4. Configure:
+   - **Name**: `project-scope`
+   - **Type**: `command`
+   - **Command**: `node /absolute/path/to/ProjectScopeMCP/dist/index.js`
+   *(Or use `npm run start` if preferred)*
+
+### Other Clients (Windsurf, etc.)
+
+This server follows the standard Model Context Protocol. For generic clients:
+- **Command**: `node`
+- **Arguments**: `['/path/to/dist/index.js']`
+- **Environment Variables**: passing `Key=Value` if needed (e.g., `HUGGINGFACE_TOKEN`).
 
 ---
 
-## � Tool Reference
+##  Tool Reference
 
 ### Repository Analysis
 
@@ -164,7 +179,7 @@ Includes standard Git tools for agentic workflows:
 
 ---
 
-## ❓ Troubleshooting
+## Troubleshooting
 
 **"Repo Scan Too Slow"**
 - Add large directories (e.g., `vendor`, `node_modules`) to `excludePatterns`. 
@@ -175,6 +190,6 @@ Includes standard Git tools for agentic workflows:
 
 ---
 
-## 📜 License
+## License
 
 This project is licensed under the **ISC License**.
