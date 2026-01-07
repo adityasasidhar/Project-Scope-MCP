@@ -8,6 +8,8 @@ import { getRepoStructure } from "./tools/repo-structure.js";
 import { analyzeImpact } from "./tools/impact-analysis.js";
 import { gitBranchStatus, gitCommitHistory, gitShowChanges, gitCompareBranches, gitInit, gitStatus } from "./tools/git-tools.js";
 import { refactorRename, refactorExtractFunction, refactorMoveToFile, refactorInlineVariable, findDeadCode } from "./tools/refactoring-tools.js";
+import { validateShellInput, validateSqlQuery, validateFilePath, detectTemplateInjection, detectPromptInjectionAsync, createSecurityVisualization, scanFileForThreats, scanRepoForThreats } from "./tools/security-tools.js";
+import * as fs from "fs/promises";
 
 const server = new Server(
     {
@@ -281,6 +283,103 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     required: ["path"],
                 },
             },
+            // Security Validation Tools
+            {
+                name: "validate_shell_input",
+                description: "Validate a string for shell command injection attacks. Detects metacharacters, command substitution, environment variable manipulation, null bytes, and other shell exploits.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        input: { type: "string", description: "The shell command or string to validate" },
+                        mode: { type: "string", enum: ["strict", "advisory"], description: "Validation mode: 'strict' blocks threats, 'advisory' provides warnings (default: strict)" },
+                        sensitivity: { type: "string", enum: ["high", "medium", "low"], description: "Detection sensitivity (default: high)" },
+                    },
+                    required: ["input"],
+                },
+            },
+            {
+                name: "validate_sql_query",
+                description: "Scan SQL queries for injection patterns. Detects classic injections, union-based attacks, stacked queries, comment injection, time-based/boolean-based blind injections, encoding tricks, and out-of-band commands.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        query: { type: "string", description: "The SQL query string to validate" },
+                        mode: { type: "string", enum: ["strict", "advisory"], description: "Validation mode (default: strict)" },
+                        sensitivity: { type: "string", enum: ["high", "medium", "low"], description: "Detection sensitivity (default: high)" },
+                    },
+                    required: ["query"],
+                },
+            },
+            {
+                name: "validate_file_path",
+                description: "Validate file paths for directory traversal attacks. Detects relative traversal, URL encoding, double encoding, null bytes, unicode tricks, UNC paths, and paths outside project root.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        filePath: { type: "string", description: "The file path to validate" },
+                        projectRoot: { type: "string", description: "Project root directory to check containment against" },
+                        mode: { type: "string", enum: ["strict", "advisory"], description: "Validation mode (default: strict)" },
+                        sensitivity: { type: "string", enum: ["high", "medium", "low"], description: "Detection sensitivity (default: high)" },
+                    },
+                    required: ["filePath"],
+                },
+            },
+            {
+                name: "detect_template_injection",
+                description: "Detect template engine injection (SSTI) attempts. Identifies Jinja2, Handlebars, ERB, Freemarker, Velocity, Thymeleaf, Pug syntax and RCE payloads.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        content: { type: "string", description: "The string or code content to analyze" },
+                        mode: { type: "string", enum: ["strict", "advisory"], description: "Validation mode (default: strict)" },
+                        sensitivity: { type: "string", enum: ["high", "medium", "low"], description: "Detection sensitivity (default: high)" },
+                    },
+                    required: ["content"],
+                },
+            },
+            {
+                name: "detect_prompt_injection",
+                description: "Detect prompt injection attempts targeting AI agents. Identifies role-switching, instruction override, context escape, payload markers, invisible characters, data exfiltration, tool manipulation, and encoded content. Optionally uses Llama Prompt Guard 2 for LLM-based detection.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        content: { type: "string", description: "The text content to analyze (from files, web pages, user input, tool descriptions)" },
+                        mode: { type: "string", enum: ["strict", "advisory"], description: "Validation mode (default: strict)" },
+                        sensitivity: { type: "string", enum: ["high", "medium", "low"], description: "Detection sensitivity (default: high)" },
+                        useGuardModel: { type: "boolean", description: "Enable Llama Prompt Guard 2 LLM-based detection (default: false)" },
+                        huggingfaceToken: { type: "string", description: "HuggingFace API token (required if useGuardModel is true)" },
+                    },
+                    required: ["content"],
+                },
+            },
+            // File and Repo Scanning Tools
+            {
+                name: "scan_file_for_threats",
+                description: "Scan a single file for all security threats (shell injection, SQL injection, path traversal, template injection, prompt injection) with line-level detection.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        filePath: { type: "string", description: "Path to the file to scan" },
+                        mode: { type: "string", enum: ["strict", "advisory"], description: "Validation mode (default: strict)" },
+                        sensitivity: { type: "string", enum: ["high", "medium", "low"], description: "Detection sensitivity (default: high)" },
+                    },
+                    required: ["filePath"],
+                },
+            },
+            {
+                name: "scan_repo_for_threats",
+                description: "Scan an entire repository for security threats. Uses regex-only detection (no API calls) for fast, comprehensive scanning.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        path: { type: "string", description: "Root path of the repository to scan" },
+                        excludePatterns: { type: "array", items: { type: "string" }, description: "Additional glob patterns to exclude (node_modules, .git already excluded)" },
+                        mode: { type: "string", enum: ["strict", "advisory"], description: "Validation mode (default: strict)" },
+                        sensitivity: { type: "string", enum: ["high", "medium", "low"], description: "Detection sensitivity (default: high)" },
+                    },
+                    required: ["path"],
+                },
+            },
         ],
     };
 });
@@ -438,6 +537,118 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             });
             return {
                 content: [{ type: "text", text: result.visualization }],
+            };
+        }
+        // Security Tool Handlers
+        else if (name === "validate_shell_input") {
+            if (!args) throw new Error("Arguments are required");
+            const result = validateShellInput(
+                args.input as string,
+                {
+                    mode: (args.mode as 'strict' | 'advisory') || 'strict',
+                    sensitivity: (args.sensitivity as 'high' | 'medium' | 'low') || 'high',
+                }
+            );
+            const viz = createSecurityVisualization("Shell Command Validator", result);
+            return {
+                content: [{ type: "text", text: viz + "\n" + JSON.stringify(result, null, 2) }],
+            };
+        }
+        else if (name === "validate_sql_query") {
+            if (!args) throw new Error("Arguments are required");
+            const result = validateSqlQuery(
+                args.query as string,
+                {
+                    mode: (args.mode as 'strict' | 'advisory') || 'strict',
+                    sensitivity: (args.sensitivity as 'high' | 'medium' | 'low') || 'high',
+                }
+            );
+            const viz = createSecurityVisualization("SQL Injection Detector", result);
+            return {
+                content: [{ type: "text", text: viz + "\n" + JSON.stringify(result, null, 2) }],
+            };
+        }
+        else if (name === "validate_file_path") {
+            if (!args) throw new Error("Arguments are required");
+            const result = validateFilePath(
+                args.filePath as string,
+                args.projectRoot as string | undefined,
+                {
+                    mode: (args.mode as 'strict' | 'advisory') || 'strict',
+                    sensitivity: (args.sensitivity as 'high' | 'medium' | 'low') || 'high',
+                }
+            );
+            const viz = createSecurityVisualization("Path Traversal Validator", result);
+            return {
+                content: [{ type: "text", text: viz + "\n" + JSON.stringify(result, null, 2) }],
+            };
+        }
+        else if (name === "detect_template_injection") {
+            if (!args) throw new Error("Arguments are required");
+            const result = detectTemplateInjection(
+                args.content as string,
+                {
+                    mode: (args.mode as 'strict' | 'advisory') || 'strict',
+                    sensitivity: (args.sensitivity as 'high' | 'medium' | 'low') || 'high',
+                }
+            );
+            const viz = createSecurityVisualization("Template Injection Detector", result);
+            return {
+                content: [{ type: "text", text: viz + "\n" + JSON.stringify(result, null, 2) }],
+            };
+        }
+        else if (name === "detect_prompt_injection") {
+            if (!args) throw new Error("Arguments are required");
+            const result = await detectPromptInjectionAsync(
+                args.content as string,
+                {
+                    mode: (args.mode as 'strict' | 'advisory') || 'strict',
+                    sensitivity: (args.sensitivity as 'high' | 'medium' | 'low') || 'high',
+                    useGuardModel: args.useGuardModel as boolean | undefined,
+                    huggingfaceToken: args.huggingfaceToken as string | undefined,
+                }
+            );
+            const vizTitle = result.llm_guard
+                ? "Prompt Injection Detector (LLM Enhanced)"
+                : "Prompt Injection Detector";
+            const viz = createSecurityVisualization(vizTitle, result);
+            return {
+                content: [{ type: "text", text: viz + "\n" + JSON.stringify(result, null, 2) }],
+            };
+        }
+        // File and Repo Scanning Handlers
+        else if (name === "scan_file_for_threats") {
+            if (!args) throw new Error("Arguments are required");
+            const filePath = args.filePath as string;
+            const content = await fs.readFile(filePath, 'utf-8');
+            const result = await scanFileForThreats(
+                filePath,
+                content,
+                {
+                    mode: (args.mode as 'strict' | 'advisory') || 'strict',
+                    sensitivity: (args.sensitivity as 'high' | 'medium' | 'low') || 'high',
+                }
+            );
+            const status = result.threats_detected ? 'THREATS_FOUND' : 'SAFE';
+            const summary = `${result.summary.critical}C ${result.summary.high}H ${result.summary.medium}M ${result.summary.low}L`;
+            return {
+                content: [{ type: "text", text: `[File Scan] ${status} | ${summary}\n${JSON.stringify(result, null, 2)}` }],
+            };
+        }
+        else if (name === "scan_repo_for_threats") {
+            if (!args) throw new Error("Arguments are required");
+            const result = await scanRepoForThreats(
+                args.path as string,
+                (args.excludePatterns as string[]) || [],
+                {
+                    mode: (args.mode as 'strict' | 'advisory') || 'strict',
+                    sensitivity: (args.sensitivity as 'high' | 'medium' | 'low') || 'high',
+                }
+            );
+            const status = result.threats_detected ? 'THREATS_FOUND' : 'SAFE';
+            const summary = `${result.files_scanned} files | ${result.files_with_threats} with threats | ${result.summary.critical}C ${result.summary.high}H ${result.summary.medium}M ${result.summary.low}L`;
+            return {
+                content: [{ type: "text", text: `[Repo Scan] ${status} | ${summary}\n${JSON.stringify(result, null, 2)}` }],
             };
         } else {
             throw new Error(`Unknown tool: ${name}`);

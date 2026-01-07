@@ -1,8 +1,11 @@
 {
-  "name": "projectscopemcp",
+  "name": "project-scope",
   "version": "1.0.0",
-  "description": "",
+  "description": "MCP server for repository analysis, Git operations, and code refactoring tools",
   "main": "dist/index.js",
+  "bin": {
+    "project-scope": "dist/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
@@ -13,12 +16,22 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
-  "private": true,
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "git",
+    "refactoring",
+    "code-analysis"
+  ],
+  "author": "adityasasidhar",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adityasasidhar/Project-Scope-MCP.git"
+  },
   "type": "module",
   "dependencies": {
+    "@huggingface/inference": "^4.13.5",
     "@modelcontextprotocol/sdk": "^1.25.1",
     "fast-glob": "^3.3.3",
     "ignore": "^7.0.5",
