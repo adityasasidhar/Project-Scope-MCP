@@ -1,5 +1,5 @@
 name: project-scope-mcp
-description: Production-ready MCP server for semantic code analysis, safe refactoring, security scanning, and Git operations.
+description: MCP server providing semantic repository analysis, safe AST-based refactoring, security scanning, and Git operations.
 version: 0.1.0
 
 runtime:
@@ -16,6 +16,7 @@ categories:
 
 tags:
   - mcp
+  - repository-analysis
   - ast
   - refactoring
   - git
