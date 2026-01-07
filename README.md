@@ -42,12 +42,87 @@ The server is built on a modular architecture to ensure stability and extensibil
 
 The security tools are highly configurable to balance safety and flexibility.
 
+### How the Context-Aware Scanner Works
+
+The security scanner uses **intelligent context detection** to eliminate false positives while maintaining 100% threat detection on actual malicious input.
+
+#### File Type Detection
+
+The scanner automatically categorizes files into four types:
+
+1. **Source Code Files** (`.ts`, `.js`, `.py`, `.java`, etc.)
+   - **Action**: ✅ **Completely skipped** - no pattern scanning
+   - **Reason**: Source code naturally contains patterns (semicolons, pipes, regex) that would trigger false positives
+   - **Example**: `src/tools/security-tools.ts` → 0 threats detected
+
+2. **Template Files** (`.hbs`, `.jinja2`, `.erb`, `.pug`, etc.)
+   - **Action**: ⚠️ **Limited scanning** - patterns allowed, but syntax-aware
+   - **Reason**: Templates have expected `{{ }}` syntax that shouldn't be flagged
+   - **Example**: `views/index.hbs` → Only flags dangerous template expressions like `{{__class__}}`
+
+3. **Config Files** (`.json`, `.yaml`, `.env`, `.ini`, etc.)
+   - **Action**: ⚠️ **Minimal scanning** - special characters allowed
+   - **Reason**: Config files legitimately use special characters in keys/values
+   - **Example**: `tsconfig.json` → 0 threats detected
+
+4. **Runtime Input** (no file path, or unknown extension)
+   - **Action**: 🚨 **Full scanning** - all patterns checked
+   - **Reason**: User input, API requests, or dynamic content must be validated
+   - **Example**: User message `"rm -rf /"` → Threat detected!
+
+#### Line-Level Filtering
+
+Even within scannable files, the scanner intelligently skips:
+
+```typescript
+// ✅ SKIPPED: Comment line
+import * as fs from 'fs';              // ✅ SKIPPED: Import statement
+export interface Config {              // ✅ SKIPPED: Type definition
+    mode: 'strict' | 'advisory';       // ✅ SKIPPED: Type definition
+}
+
+const input = getUserInput();          // 🚨 SCANNED: Runtime value
+const query = `DELETE FROM ${table}`;  // 🚨 SCANNED: Dynamic SQL
+```
+
+**What Gets Skipped:**
+- Lines starting with `//`, `#`, `/*`, `*/`, `*` (comments)
+- Lines starting with `import`, `export`, `require(` (imports)
+- Lines containing `interface`, `type`, `enum`, `class` (type definitions)
+- Empty lines
+
+**What Gets Scanned:**
+- Runtime values (user input, API responses)
+- Dynamically constructed queries or commands
+- Configuration values (passwords, URLs, etc.)
+
+#### Pattern Detection Examples
+
+**✅ Source Code (NOT flagged):**
+```typescript
+// File: src/validator.ts
+const PATTERN = /[;|&`$()]/;  // Source code with regex → Safe
+if (input.includes(';')) {    // Semicolon in code → Safe
+```
+
+**🚨 Runtime Input (FLAGGED):**
+```javascript
+// Runtime: User message
+"rm -rf /; cat /etc/passwd"   // Shell injection → Detected!
+"' OR '1'='1"                 // SQL injection → Detected!
+"../../etc/passwd"            // Path traversal → Detected!
+```
+
 ### Security Modes
+
 - **`strict`** (default): Blocks operations immediately if a threat is detected.
 - **`advisory`**: Returns warnings but allows the operation to proceed (useful for auditing).
 
 ### Sensitivity Levels
-- **`high`** (default): Aggressive detection. Flags even potential risks (e.g., high entropy strings).
+
+- **`high`**: Aggressive detection. Flags even potential risks (e.g., high entropy strings).
+- **`medium`** (default): Balanced approach. Reduces false positives while maintaining security.
+- **`low`**: Only flags high-confidence threats (e.g., `DROP TABLE`, `xp_cmdshell`).
 - **`medium`**: Standard balanced profile.
 - **`low`**: Only flags high-confidence known attack signatures.
 

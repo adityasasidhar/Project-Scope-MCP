@@ -37,6 +37,141 @@ const DEFAULT_CONFIG: SecurityConfig = {
 type RiskLevel = 'critical' | 'high' | 'medium' | 'low';
 
 // ============================================
+// Context Detection for Smart Scanning
+// ============================================
+
+export interface ScanContext {
+    fileType: 'source' | 'template' | 'config' | 'runtime' | 'unknown';
+    language?: string;
+    shouldScanForPatterns: boolean;
+    shouldScanStrings: boolean;
+    filePath?: string;
+}
+
+// Source code extensions where patterns are expected (don't scan)
+const SOURCE_CODE_EXTENSIONS = new Set([
+    'ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs',
+    'py', 'pyi', 'java', 'go', 'rs',
+    'c', 'cpp', 'cc', 'cxx', 'h', 'hpp',
+    'cs', 'rb', 'php', 'swift', 'kt', 'scala',
+    'm', 'mm', 'r', 'jl', 'nim'
+]);
+
+// Template file extensions (scan carefully, context-aware)
+const TEMPLATE_EXTENSIONS = new Set([
+    'hbs', 'handlebars', 'jinja', 'jinja2', 'j2',
+    'erb', 'ejs', 'pug', 'jade', 'twig',
+    'mustache', 'liquid', 'eta'
+]);
+
+// Config file extensions (limited scanning)
+const CONFIG_EXTENSIONS = new Set([
+    'json', 'yaml', 'yml', 'toml', 'ini',
+    'env', 'config', 'conf', 'xml'
+]);
+
+/**
+ * Detect file context from file path
+ */
+function detectFileContext(filePath: string): ScanContext {
+    const ext = path.extname(filePath).slice(1).toLowerCase();
+    const basename = path.basename(filePath).toLowerCase();
+
+    // Detect source code files
+    if (SOURCE_CODE_EXTENSIONS.has(ext)) {
+        return {
+            fileType: 'source',
+            language: ext,
+            shouldScanForPatterns: false, // Don't scan source code!
+            shouldScanStrings: false,
+            filePath
+        };
+    }
+
+    // Detect template files
+    if (TEMPLATE_EXTENSIONS.has(ext)) {
+        return {
+            fileType: 'template',
+            language: ext,
+            shouldScanForPatterns: true,
+            shouldScanStrings: false, // Templates have expected syntax
+            filePath
+        };
+    }
+
+    // Detect config files - very limited scanning
+    if (CONFIG_EXTENSIONS.has(ext) || basename.includes('config')) {
+        return {
+            fileType: 'config',
+            shouldScanForPatterns: false, // Config files have legitimate special chars
+            shouldScanStrings: true,      // But do scan string values
+            filePath
+        };
+    }
+
+    // Runtime input or unknown - scan everything
+    return {
+        fileType: 'runtime',
+        shouldScanForPatterns: true,
+        shouldScanStrings: true,
+        filePath
+    };
+}
+
+/**
+ * Check if a line is a comment
+ */
+function isCommentLine(line: string): boolean {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+
+    // Single-line comments
+    if (trimmed.startsWith('//') ||
+        trimmed.startsWith('#') ||
+        trimmed.startsWith('*') ||
+        trimmed === '/**' ||
+        trimmed === '*/') {
+        return true;
+    }
+
+    // SQL comments
+    if (trimmed.startsWith('--')) {
+        return true;
+    }
+
+    // Multi-line comment markers
+    if (trimmed.startsWith('/*') || trimmed.endsWith('*/')) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Check if line contains import/export statement
+ */
+function isImportExport(line: string): boolean {
+    const trimmed = line.trim();
+    return trimmed.startsWith('import ') ||
+        trimmed.startsWith('export ') ||
+        trimmed.startsWith('from ') ||
+        trimmed.startsWith('require(');
+}
+
+/**
+ * Check if line is a type/interface definition
+ */
+function isTypeDefinition(line: string): boolean {
+    const trimmed = line.trim();
+    return trimmed.startsWith('interface ') ||
+        trimmed.startsWith('type ') ||
+        trimmed.startsWith('enum ') ||
+        trimmed.startsWith('class ') ||
+        trimmed.includes(': {') ||
+        /^(public|private|protected)\s/.test(trimmed);
+}
+
+// ============================================
 // Cached Regex Patterns (compiled once for performance)
 // ============================================
 
@@ -1166,12 +1301,46 @@ export async function scanFileForThreats(
     const findings: ThreatFinding[] = [];
     const lines = fileContent.split('\n');
 
+    // Detect file context
+    const context = filePath ? detectFileContext(filePath) : {
+        fileType: 'runtime' as const,
+        shouldScanForPatterns: true,
+        shouldScanStrings: true
+    };
+
+    // Skip scanning source code files entirely
+    if (context.fileType === 'source') {
+        return {
+            threats_detected: false,
+            file: filePath || 'unknown',
+            findings: [],
+            summary: {
+                critical: 0,
+                high: 0,
+                medium: 0,
+                low: 0,
+            },
+        };
+    }
+
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const lineNum = i + 1;
 
         // Skip empty lines
         if (!line.trim()) continue;
+
+        // Skip comments
+        if (isCommentLine(line)) continue;
+
+        // Skip import/export statements
+        if (isImportExport(line)) continue;
+
+        // Skip type definitions
+        if (isTypeDefinition(line)) continue;
+
+        // Only scan if context allows
+        if (!context.shouldScanForPatterns) continue;
 
         // Check for shell injection
         const shellResult = validateShellInput(line, config);
@@ -1209,16 +1378,18 @@ export async function scanFileForThreats(
             });
         }
 
-        // Check for template injection
-        const templateResult = detectTemplateInjection(line, config);
-        if (!templateResult.safe) {
-            findings.push({
-                type: 'template_injection',
-                line: lineNum,
-                content: line.substring(0, 100),
-                risk_level: templateResult.risk_level,
-                details: templateResult.template_syntax,
-            });
+        // Check for template injection (context-aware)
+        if (context.fileType !== 'template') {
+            const templateResult = detectTemplateInjection(line, config);
+            if (!templateResult.safe) {
+                findings.push({
+                    type: 'template_injection',
+                    line: lineNum,
+                    content: line.substring(0, 100),
+                    risk_level: templateResult.risk_level,
+                    details: templateResult.template_syntax,
+                });
+            }
         }
 
         // Check for prompt injection
