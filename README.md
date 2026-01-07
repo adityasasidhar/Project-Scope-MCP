@@ -34,7 +34,23 @@ Project Scope moves beyond simple file reading to provide **semantic analysis**,
 
 ---
 
-## Installation
+[![npm version](https://badge.fury.io/js/%40adityasasidhar%2Fproject-scope-mcp.svg)](https://badge.fury.io/js/%40adityasasidhar%2Fproject-scope-mcp)
+
+---
+
+## Quick Start
+
+Run instantly with `npx`:
+
+```bash
+npx -y @adityasasidhar/project-scope-mcp
+```
+
+---
+
+## Installation (Source)
+
+To build from source:
 
 ```bash
 # Install dependencies
