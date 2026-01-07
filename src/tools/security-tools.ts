@@ -50,9 +50,17 @@ const SHELL_PATTERNS = {
     newlines: /[\n\r]/,
     pipeChain: /\|{1,2}/,
     andOr: /&&|\|\|/,
-    redirects: />>{1,2}|<{1,2}/,
+    redirects: />>{1,2}|<<{1,2}/,
     subshell: /\(\s*[^)]+\s*\)/,
     backgroundExec: /&\s*$/,
+    // Advanced patterns
+    processSubstitution: /<\([^)]+\)|>\([^)]+\)/,
+    hereDoc: /<<-?\s*['"]?\w+['"]?/,
+    braceExpansion: /\{[^}]*,[^}]*\}|\{\.\.|\.\.\}/,
+    arithmeticExpansion: /\$\(\([^)]+\)\)/,
+    commandGrouping: /\{\s*[^}]+;\s*\}/,
+    globbing: /\*{2,}|\/\*|[?*\[\]]/,
+    tilde: /~[a-z_][a-z0-9_-]*/i,
 };
 
 // SQL injection patterns
@@ -67,6 +75,15 @@ const SQL_PATTERNS = {
     outOfBand: /xp_cmdshell|LOAD_FILE\s*\(|INTO\s+OUTFILE|INTO\s+DUMPFILE/i,
     adminComment: /admin\s*'?\s*--/i,
     tautology: /'?\s*=\s*'|1\s*=\s*1|'a'\s*=\s*'a'/i,
+    // Advanced patterns
+    nosqlOperators: /\$where|\$ne|\$gt|\$lt|\$regex|\$in|\$nin|\$exists/i,
+    nosqlInjection: /\{\s*\$(?:where|ne|gt|lt|regex|in|nin)\s*:/i,
+    xmlInjection: /extractvalue\s*\(|updatexml\s*\(|xmltype\s*\(/i,
+    polyglot: /<script>|<img\s+src=|javascript:|onerror\s*=/i,
+    secondOrder: /INSERT\s+INTO.*VALUES.*['"].*[<>{}]/i,
+    ormBypass: /findOne\s*\(|find\s*\(\s*\{|\$or\s*:\s*\[/i,
+    mssqlSpecific: /xp_|sp_|master\.\.|sysobjects|syscolumns/i,
+    postgresSpecific: /pg_sleep\s*\(|pg_read_file\s*\(/i,
 };
 
 // Path traversal patterns
@@ -81,6 +98,11 @@ const PATH_PATTERNS = {
     mixedSeparators: /\.\.\\\/|\.\.\/\\/,
     absoluteLinux: /^\/(?:etc|proc|sys|dev|root|home|usr|var|tmp)(?:\/|$)/i,
     absoluteWindows: /^[A-Za-z]:\\(?:Windows|Program Files|Users|System32)/i,
+    // Advanced patterns
+    windowsShortName: /~\d+|PROGRA~1|SYSTEM~1/i,
+    caseVariation: /\.\.[%]5[Cc]/,
+    longPath: /.{261,}/,
+    wildcardTraversal: /\.\.[\\/]\*[\\/]\.\./,
 };
 
 // Template injection patterns
@@ -89,13 +111,19 @@ const TEMPLATE_PATTERNS = {
     jinjaConfig: /\{\{\s*config\s*\}\}|\{\{\s*request\s*\}\}|\{\{\s*self\s*\}\}/i,
     jinjaMath: /\{\{\s*\d+\s*\*\s*\d+\s*\}\}/,
     handlebars: /\{\{\{[^}]*\}\}\}|\{\{#[^}]+\}\}/,
-    erb: /<%[=-]?[^%]*%>/,
+    erb: /<% [=-]?[^%]*%>/,
     freemarker: /\$\{[^}]+\}|<#[^>]+>/,
     velocity: /#set\s*\(|#foreach\s*\(/,
     thymeleaf: /\[\[\$\{|\*\{[^}]+\}/,
     pug: /#\{[^}]+\}|=\s+[^;]+/,
     ssti: /__class__|__mro__|__globals__|__builtins__|__import__|getattr|popen/,
     evalExpr: /eval\s*\(|exec\s*\(|compile\s*\(/,
+    // Advanced patterns
+    pythonFormat: /\{0\.__class__|\{\w+\.__/,
+    twigSyntax: /\{\{\s*_self\s*\}\}|\{\{\s*_context\s*\}\}/i,
+    smarty: /\{php\}|\{literal\}|\{\$smarty/i,
+    jspJstl: /<c:out|<jsp:|\$\{param\./i,
+    angularjs: /\{\{constructor\.constructor|\{\{\[]['"]/,
 };
 
 // Prompt injection patterns
@@ -110,6 +138,14 @@ const PROMPT_PATTERNS = {
     toolManipulation: /use\s+tool|execute|run\s+command|call\s+function|invoke/i,
     memoryPoisoning: /remember\s+that|always\s+respond\s+with|from\s+now\s+on/i,
     developerMode: /developer\s+mode|jailbreak|DAN|do\s+anything\s+now/i,
+    // Advanced patterns
+    base64Pattern: /[A-Za-z0-9+\/]{20,}={0,2}/,
+    rot13Pattern: /[A-Za-z]{10,}\s+[A-Za-z]{10,}/,
+    unicodeEscape: /\\u[0-9a-fA-F]{4}|\\x[0-9a-fA-F]{2}/,
+    multilingualBypass: /[\u4E00-\u9FFF\uAC00-\uD7AF\u0400-\u04FF]{3,}/,
+    tokenSmuggling: /(\w+\s*){20,}/,
+    systemExtraction: /repeat\s+your\s+(instructions|prompt|system)|what\s+(are|were)\s+your\s+instructions/i,
+    cotManipulation: /let'?s\s+think\s+step\s+by\s+step.*?(ignore|disregard)/i,
 };
 
 // ============================================
@@ -192,6 +228,41 @@ export function validateShellInput(
     // Check for background execution
     if (SHELL_PATTERNS.backgroundExec.test(input)) {
         threats.push('background_execution');
+    }
+
+    // Check for process substitution
+    if (SHELL_PATTERNS.processSubstitution.test(input)) {
+        threats.push('process_substitution');
+    }
+
+    // Check for here-documents
+    if (SHELL_PATTERNS.hereDoc.test(input)) {
+        threats.push('here_document');
+    }
+
+    // Check for brace expansion
+    if (SHELL_PATTERNS.braceExpansion.test(input)) {
+        threats.push('brace_expansion');
+    }
+
+    // Check for arithmetic expansion
+    if (SHELL_PATTERNS.arithmeticExpansion.test(input)) {
+        threats.push('arithmetic_expansion');
+    }
+
+    // Check for command grouping
+    if (SHELL_PATTERNS.commandGrouping.test(input)) {
+        threats.push('command_grouping');
+    }
+
+    // Check for globbing patterns
+    if (SHELL_PATTERNS.globbing.test(input)) {
+        threats.push('globbing_pattern');
+    }
+
+    // Check for tilde expansion
+    if (SHELL_PATTERNS.tilde.test(input)) {
+        threats.push('tilde_expansion');
     }
 
     // Check allowlist if in advisory mode
@@ -322,6 +393,46 @@ export function validateSqlQuery(
         injectionTypes.push('out_of_band');
         if (upperQuery.includes('XP_CMDSHELL')) suspiciousKeywords.push('xp_cmdshell');
         if (upperQuery.includes('LOAD_FILE')) suspiciousKeywords.push('LOAD_FILE()');
+    }
+
+    // Check for NoSQL injection
+    if (SQL_PATTERNS.nosqlOperators.test(query) || SQL_PATTERNS.nosqlInjection.test(query)) {
+        injectionTypes.push('nosql_injection');
+        suspiciousKeywords.push('$operator');
+    }
+
+    // Check for XML injection
+    if (SQL_PATTERNS.xmlInjection.test(query)) {
+        injectionTypes.push('xml_injection');
+        if (upperQuery.includes('EXTRACTVALUE')) suspiciousKeywords.push('extractvalue()');
+        if (upperQuery.includes('UPDATEXML')) suspiciousKeywords.push('updatexml()');
+    }
+
+    // Check for polyglot payloads
+    if (SQL_PATTERNS.polyglot.test(query)) {
+        injectionTypes.push('polyglot_sqli_xss');
+        suspiciousKeywords.push('<script>');
+    }
+
+    // Check for second-order injection markers
+    if (SQL_PATTERNS.secondOrder.test(query)) {
+        injectionTypes.push('second_order_marker');
+    }
+
+    // Check for ORM bypass patterns
+    if (SQL_PATTERNS.ormBypass.test(query)) {
+        injectionTypes.push('orm_bypass');
+    }
+
+    // Check for database-specific vectors
+    if (SQL_PATTERNS.mssqlSpecific.test(query)) {
+        injectionTypes.push('mssql_specific');
+        suspiciousKeywords.push('xp_/sp_');
+    }
+
+    if (SQL_PATTERNS.postgresSpecific.test(query)) {
+        injectionTypes.push('postgres_specific');
+        suspiciousKeywords.push('pg_sleep');
     }
 
     // Apply allowlist filtering
