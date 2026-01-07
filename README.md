@@ -53,6 +53,10 @@ npx -y @adityasasidhar/project-scope-mcp
 To build from source:
 
 ```bash
+# Clone the repository
+git clone https://github.com/adityasasidhar/Project-Scope-MCP.git
+cd Project-Scope-MCP
+
 # Install dependencies
 npm install
 
