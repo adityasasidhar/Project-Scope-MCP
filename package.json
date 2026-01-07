@@ -1,5 +1,5 @@
 {
-  "name": "project-scope",
+  "name": "@adityasasidhar/project-scope-mcp",
   "version": "1.0.0",
   "description": "MCP server for repository analysis, Git operations, and code refactoring tools",
   "main": "dist/index.js",
