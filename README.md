@@ -112,6 +112,41 @@ This ensures that *documenting* a security vulnerability in a comment or test fi
 }
 ```
 
+### Claude Code (CLI)
+
+The official [Claude Code CLI](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) supports MCP natively.
+
+1.  **Add the server:**
+    Run the following command in your terminal:
+    ```bash
+    claude mcp add project-scope -- npx -y @adityasasidhar/project-scope-mcp
+    ```
+
+2.  **Verify:**
+    Run `claude` and type `/mcp` to see the connected servers.
+
+### Codex CLI
+
+[Codex CLI](https://github.com/openai/codex-cli) (if applicable) supports MCP via its TOML configuration.
+
+1.  **Edit Configuration:**
+    Open `~/.codex/config.toml`.
+
+2.  **Add Server:**
+    ```toml
+    [mcp.servers.project-scope]
+    command = "npx"
+    args = ["-y", "@adityasasidhar/project-scope-mcp"]
+    ```
+
+### Generic Clients
+
+For any other client that supports MCP (like **Windsurf**, **Smithery**, **Goose**, or custom implementations), use the standard stdio configuration:
+
+```bash
+npx -y @adityasasidhar/project-scope-mcp
+```
+
 ### Cursor
 
 1. Open **Cursor Settings** (Cmd/Ctrl + Shift + J).
@@ -123,12 +158,7 @@ This ensures that *documenting* a security vulnerability in a comment or test fi
    - **Command**: `node /absolute/path/to/ProjectScopeMCP/dist/index.js`
    *(Or use `npm run start` if preferred)*
 
-### Other Clients (Windsurf, etc.)
 
-This server follows the standard Model Context Protocol. For generic clients:
-- **Command**: `node`
-- **Arguments**: `['/path/to/dist/index.js']`
-- **Environment Variables**: passing `Key=Value` if needed (e.g., `HUGGINGFACE_TOKEN`).
 
 ---
 
