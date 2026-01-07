@@ -1,0 +1,24 @@
+name: project-scope-mcp
+description: Production-ready MCP server for semantic code analysis, safe refactoring, security scanning, and Git operations.
+version: 0.1.0
+
+runtime:
+  type: stdio
+  command: npx
+  args:
+    - -y
+    - @adityasasidhar/project-scope-mcp
+
+categories:
+  - devtools
+  - security
+  - code-analysis
+
+tags:
+  - mcp
+  - ast
+  - refactoring
+  - git
+  - typescript
+  - nodejs
+  - agent-tools
